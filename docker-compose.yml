@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "3002:3002"
+    environment:
+      - PORT=3002
+      - APP_ENV=production
+      - ONIX_URL=https://internal-whippet-profound.ngrok-free.app/bap/caller
+      - REDIS_URL=host.docker.internal:6379
+    restart: unless-stopped
