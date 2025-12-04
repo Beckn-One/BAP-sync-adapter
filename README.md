@@ -2,7 +2,7 @@
 
 A lightweight API adapter built with Go and Fiber framework that implements a synchronous wrapper over Beckn protocol APIs. Use this adapter when your BAP application must receive synchronous API responses from Beckn ONIX that is both synchronous (discover) and asynchronous (callback-based) patterns.
 
-This service is designed to still between BAP application and BAP Beckn ONIX.
+This service is designed to sit between BAP application and BAP Beckn ONIX.
 
 ## Overview
 
