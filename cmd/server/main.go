@@ -4,9 +4,11 @@ import (
 	"BAP_Sandbox/config"
 	"BAP_Sandbox/internal/routes"
 	"BAP_Sandbox/internal/storage"
+	"BAP_Sandbox/internal/transformers"
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 
 	"github.com/gofiber/fiber/v2"
@@ -32,6 +34,16 @@ func main() {
 	defer storage.CloseRedis()
 
 	log.Println("Successfully connected to Redis")
+
+	// Initialize Transformer
+	// Get the path to mappings.yaml relative to the project root
+	mappingsPath := filepath.Join("config", "mappings.yaml")
+	if err := transformers.InitTransformer(mappingsPath); err != nil {
+		log.Printf("WARNING: Failed to initialize transformer: %v", err)
+		log.Println("Application will continue without transformation capabilities")
+	} else {
+		log.Println("Successfully initialized transformer with mappings")
+	}
 
 	// Create Fiber app
 	app := fiber.New(fiber.Config{

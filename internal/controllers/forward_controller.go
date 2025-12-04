@@ -1,13 +1,16 @@
 package controllers
 
 import (
+	"BAP_Sandbox/internal/transformers"
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -141,13 +144,37 @@ func (fc *ForwardController) ForwardRequest(c *fiber.Ctx) error {
 }
 
 // forwardRequestSync forwards the request synchronously and returns the direct response
+// Applies transformations for sync routes (search/discover)
 func (fc *ForwardController) forwardRequestSync(c *fiber.Ctx, subRoute string, body []byte) error {
+	// Get the transformer instance
+	transformer, err := transformers.GetTransformer()
+	if err != nil {
+		log.Printf("[Forward] WARNING: Transformer not available: %v", err)
+		log.Printf("[Forward] Proceeding without transformation")
+	}
+
+	// Apply forward transformation if transformer is available and has mapping for this route
+	requestBody := body
+	if transformer != nil && transformer.HasMapping(subRoute) {
+		log.Printf("[Forward] Applying forward transformation for route: %s", subRoute)
+		transformedBody, err := transformer.TransformForward(subRoute, body)
+		if err != nil {
+			log.Printf("[Forward] ERROR: Forward transformation failed: %v", err)
+			errResponse := transformers.CreateMappingErrorResponse(subRoute, err)
+			return c.Status(fiber.StatusInternalServerError).JSON(errResponse)
+		}
+		requestBody = transformedBody
+		log.Printf("[Forward] Forward transformation completed successfully")
+	} else {
+		log.Printf("[Forward] No transformation mapping found for route: %s, forwarding as-is", subRoute)
+	}
+
 	// Construct the target URL
 	targetURL := fmt.Sprintf("%s/%s", fc.targetURL, subRoute)
 	log.Printf("[Forward] Making synchronous request to: %s", targetURL)
 
 	// Create a new request
-	req, err := http.NewRequest(http.MethodPost, targetURL, bytes.NewBuffer(body))
+	req, err := http.NewRequest(http.MethodPost, targetURL, bytes.NewBuffer(requestBody))
 	if err != nil {
 		log.Printf("[Forward] ERROR: Failed to create request: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -178,8 +205,23 @@ func (fc *ForwardController) forwardRequestSync(c *fiber.Ctx, subRoute string, b
 	}
 	defer resp.Body.Close()
 
+	// Handle GZIP decompression if needed
+	var reader io.Reader = resp.Body
+	if strings.Contains(strings.ToLower(resp.Header.Get("Content-Encoding")), "gzip") {
+		log.Printf("[Forward] Response is GZIP compressed, decompressing...")
+		gzipReader, err := gzip.NewReader(resp.Body)
+		if err != nil {
+			log.Printf("[Forward] ERROR: Failed to create gzip reader: %v", err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to decompress response",
+			})
+		}
+		defer gzipReader.Close()
+		reader = gzipReader
+	}
+
 	// Read the response body
-	respBody, err := io.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(reader)
 	if err != nil {
 		log.Printf("[Forward] ERROR: Failed to read response body: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -187,17 +229,41 @@ func (fc *ForwardController) forwardRequestSync(c *fiber.Ctx, subRoute string, b
 		})
 	}
 
-	// Copy response headers
+	log.Printf("[Forward] Received response (status: %d) from: %s", resp.StatusCode, targetURL)
+
+	// Apply reverse transformation to the response
+	// For search/discover, we need to transform the on_search/on_discover response
+	responseBody := respBody
+	if transformer != nil {
+		// Determine the callback route (on_search or on_discover)
+		callbackRoute := "on_" + subRoute
+
+		if transformer.HasMapping(callbackRoute) {
+			log.Printf("[Forward] Applying reverse transformation for callback route: %s", callbackRoute)
+			transformedResponse, err := transformer.TransformForward(callbackRoute, respBody)
+			if err != nil {
+				log.Printf("[Forward] ERROR: Response transformation failed: %v", err)
+				errResponse := transformers.CreateMappingErrorResponse(callbackRoute, err)
+				return c.Status(fiber.StatusInternalServerError).JSON(errResponse)
+			}
+			responseBody = transformedResponse
+			log.Printf("[Forward] Response transformation completed successfully")
+		} else {
+			log.Printf("[Forward] No transformation mapping found for callback route: %s, returning as-is", callbackRoute)
+		}
+	}
+
+	// Copy response headers (exclude Content-Encoding and Content-Length since we decompressed/transformed the body)
 	for key, values := range resp.Header {
-		if key != "Host" {
+		if key != "Host" && key != "Content-Encoding" && key != "Content-Length" {
 			for _, value := range values {
 				c.Set(key, value)
 			}
 		}
 	}
 
-	log.Printf("[Forward] ✓ Received synchronous response (status: %d), returning to client", resp.StatusCode)
-	return c.Status(resp.StatusCode).Send(respBody)
+	log.Printf("[Forward] ✓ Returning transformed response to client")
+	return c.Status(resp.StatusCode).Send(responseBody)
 }
 
 // forwardRequestAsync forwards the request to the target service asynchronously

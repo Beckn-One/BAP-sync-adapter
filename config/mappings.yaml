@@ -1,0 +1,93 @@
+mappings:
+  on_search:
+    forward: |
+      {
+        "context": {
+          "domain": "retail",
+          "version": "1.1.0",
+          "action": "on_search",
+          "bap_id": $.context.bap_id,
+          "bap_uri": $.context.bap_uri,
+          "transaction_id": $.context.transaction_id,
+          "message_id": $.context.message_id,
+          "ttl": $.context.ttl,
+          "timestamp": $.context.timestamp,
+          "bpp_id": $.context.bpp_id,
+          "bpp_uri": $.context.bpp_uri
+        },
+        "message": {
+          "catalog": {
+            "descriptor": $.message.catalogs[0].`beckn:descriptor` ? {
+              "name": $.message.catalogs[0].`beckn:descriptor`.`schema:name`,
+              "short_desc": $.message.catalogs[0].`beckn:descriptor`.`beckn:shortDesc`,
+              "long_desc": $.message.catalogs[0].`beckn:descriptor`.`beckn:longDesc`
+            } : null,
+            "providers": [
+              {
+                "id": $.message.catalogs[0].`beckn:items`[0].`beckn:provider`.`beckn:id`,
+                "descriptor": $.message.catalogs[0].`beckn:items`[0].`beckn:provider`.`beckn:descriptor` ? {
+                  "name": $.message.catalogs[0].`beckn:items`[0].`beckn:provider`.`beckn:descriptor`.`schema:name`
+                } : null,
+                "items": $.message.catalogs[0].`beckn:items`[].{
+                  "id": $.`beckn:id`,
+                  "descriptor": $.`beckn:descriptor` ? {
+                    "name": $.`beckn:descriptor`.`schema:name`,
+                    "short_desc": $.`beckn:descriptor`.`beckn:shortDesc`,
+                    "long_desc": $.`beckn:descriptor`.`beckn:longDesc`
+                  } : null
+                },
+                "locations": $.message.catalogs[0].`beckn:items`[0].`beckn:availableAt` ? $.message.catalogs[0].`beckn:items`[0].`beckn:availableAt`[].{
+                  "gps": $.`geo` ? $.`geo`.coordinates[1] & ", " & $.`geo`.coordinates[0] : null
+                } : [],
+                "fulfillments": []
+              }
+            ]
+          }
+        }
+      }
+  on_discover:
+    forward: |
+      {
+        "context": {
+          "domain": "retail",
+          "version": "1.1.0",
+          "action": "on_search",
+          "bap_id": $.context.bap_id,
+          "bap_uri": $.context.bap_uri,
+          "transaction_id": $.context.transaction_id,
+          "message_id": $.context.message_id,
+          "ttl": $.context.ttl,
+          "timestamp": $.context.timestamp,
+          "bpp_id": $.context.bpp_id,
+          "bpp_uri": $.context.bpp_uri
+        },
+        "message": {
+          "catalog": {
+            "descriptor": $.message.catalogs[0].`beckn:descriptor` ? {
+              "name": $.message.catalogs[0].`beckn:descriptor`.`schema:name`,
+              "short_desc": $.message.catalogs[0].`beckn:descriptor`.`beckn:shortDesc`,
+              "long_desc": $.message.catalogs[0].`beckn:descriptor`.`beckn:longDesc`
+            } : null,
+            "providers": [
+              {
+                "id": $.message.catalogs[0].`beckn:items`[0].`beckn:provider`.`beckn:id`,
+                "descriptor": $.message.catalogs[0].`beckn:items`[0].`beckn:provider`.`beckn:descriptor` ? {
+                  "name": $.message.catalogs[0].`beckn:items`[0].`beckn:provider`.`beckn:descriptor`.`schema:name`
+                } : null,
+                "items": $.message.catalogs[0].`beckn:items`[].{
+                  "id": $.`beckn:id`,
+                  "descriptor": $.`beckn:descriptor` ? {
+                    "name": $.`beckn:descriptor`.`schema:name`,
+                    "short_desc": $.`beckn:descriptor`.`beckn:shortDesc`,
+                    "long_desc": $.`beckn:descriptor`.`beckn:longDesc`
+                  } : null
+                },
+                "locations": $.message.catalogs[0].`beckn:items`[0].`beckn:availableAt` ? $.message.catalogs[0].`beckn:items`[0].`beckn:availableAt`[].{
+                  "gps": $.`geo` ? $.`geo`.coordinates[1] & ", " & $.`geo`.coordinates[0] : null
+                } : [],
+                "fulfillments": []
+              }
+            ]
+          }
+        }
+      }
