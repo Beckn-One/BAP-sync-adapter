@@ -1,6 +1,8 @@
-# BAP Sandbox
+# BAP Sync Adapter
 
-A lightweight API gateway built with Go and Fiber framework that implements the Beckn protocol with both synchronous (search/discover) and asynchronous (callback-based) patterns.
+A lightweight API adapter built with Go and Fiber framework that implements a synchronous wrapper over Beckn protocol APIs. Use this adapter when your BAP application must receive synchronous API responses from Beckn ONIX that is both synchronous (discover) and asynchronous (callback-based) patterns.
+
+This service is designed to still between BAP application and BAP Beckn ONIX.
 
 ## Overview
 
