@@ -47,7 +47,7 @@ type RequestContext struct {
 
 // isSyncRoute checks if the route should use synchronous forwarding
 func (fc *ForwardController) isSyncRoute(subRoute string) bool {
-	return subRoute == "search" || subRoute == "discover"
+	return subRoute == "discover"
 }
 
 // ForwardRequest forwards the incoming request to the target service and waits for callback
