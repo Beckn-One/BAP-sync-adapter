@@ -9,16 +9,16 @@ This service is designed to sit between BAP application and BAP Beckn ONIX.
 This service implements both **async** and **sync** request-response patterns:
 
 ### Async Pattern (Default for most routes)
-1. Receives POST requests at `/api/{sub-route}` (e.g., `/api/select`, `/api/init`)
+1. Receives POST requests at `/api/{sub-route}` (e.g. `/api/search`, `/api/select`)
 2. Forwards them to target service at `{ONIX_URL}/{sub-route}`
-3. Waits for async callback on `/webhook/{on_sub-route}` (e.g., `/webhook/on_select`)
+3. Waits for async callback on `/webhook/{on_sub-route}` (e.g., `/webhook/on_search`)
 4. Matches request and callback using `transaction_id` and `message_id`
 5. Returns the callback response to the original caller
 6. Returns timeout error if no callback within 30 seconds
 
-### Sync Pattern (For search and discover calls)
-1. Receives POST requests at `/api/search` or `/api/discover`
-2. Forwards them synchronously to target service at `{ONIX_URL}/search` or `{ONIX_URL}/discover`
+### Sync Pattern (For discover calls)
+1. Receives POST requests at `/api/discover`
+2. Forwards them synchronously to target service at `{ONIX_URL}/discover`
 3. Waits for immediate HTTP response from target service
 4. Returns the response directly to the caller (no webhook involved)
 
@@ -130,12 +130,7 @@ The server will start on the port specified in your `.env` file (default: 3000).
   Response: {"status": "ok", "message": "Server is running"}
   ```
 
-### Sync Endpoints (For search and discover)
-- `POST /api/search` - Synchronous search endpoint
-  - Forwards request to `{ONIX_URL}/search`
-  - Returns immediate response from target service
-  - No webhook callback involved
-  - No timeout (uses standard HTTP timeout)
+### Sync Endpoints (For discover)
 
 - `POST /api/discover` - Synchronous discover endpoint
   - Forwards request to `{ONIX_URL}/discover`
@@ -145,7 +140,7 @@ The server will start on the port specified in your `.env` file (default: 3000).
 
 ### Async Forwarding Endpoint (For other routes)
 - `POST /api/{sub-route}` - Forwards request and waits for webhook callback
-  - Applies to: select, init, confirm, update, track, rating, support, cancel, status
+  - Applies to: search, select, init, confirm, update, track, rating, support, cancel, status
   - Requires `context.transaction_id` and `context.message_id` in request body
   - Forwards to `{ONIX_URL}/{sub-route}`
   - Waits up to 30 seconds for callback on `/webhook/{on_sub-route}`
@@ -162,12 +157,12 @@ The server will start on the port specified in your `.env` file (default: 3000).
 ### Sync Routes (No webhook)
 | Forward Route | Response Type |
 |--------------|---------------|
-| `/api/search` | Synchronous HTTP response |
 | `/api/discover` | Synchronous HTTP response |
 
 ### Async Routes (Webhook-based)
 | Forward Route | Webhook Route  |
 |--------------|----------------|
+| `/api/search`   | `/webhook/on_search`   |
 | `/api/select`   | `/webhook/on_select`   |
 | `/api/init`     | `/webhook/on_init`     |
 | `/api/confirm`  | `/webhook/on_confirm`  |
@@ -221,16 +216,16 @@ REDIS_PASSWORD=your-password
 
 ## Usage Example
 
-### Sync Flow (Search/Discover)
+### Sync Flow (Discover)
 
 **Request to BAP Sandbox (returns immediately):**
 ```bash
-curl -X POST http://localhost:3000/api/search \
+curl -X POST http://localhost:3000/api/discover \
   -H "Content-Type: application/json" \
   -d '{
     "context": {
       "domain": "retail",
-      "action": "search",
+      "action": "discover",
       "location": {
         "country": {
           "name": "India",
@@ -255,7 +250,7 @@ curl -X POST http://localhost:3000/api/search \
 {
   "context": {
     "domain": "retail",
-    "action": "on_search"
+    "action": "on_discover"
   },
   "message": {
     "catalog": {
@@ -276,7 +271,7 @@ curl -X POST http://localhost:3000/api/search \
 }
 ```
 
-### Async Flow (Select/Init/Confirm/etc.)
+### Async Flow (Search/Select/Init/etc.)
 
 **1. Client sends request to BAP Sandbox:**
 ```bash
@@ -353,9 +348,9 @@ If no callback is received within 30 seconds:
 
 ## How It Works
 
-### Sync Routes (Search/Discover)
-1. **Client Request** - Sends POST to `/api/search` or `/api/discover`
-2. **Forward Request** - Gateway forwards request to `{ONIX_URL}/search` or `{ONIX_URL}/discover`
+### Sync Routes (Discover)
+1. **Client Request** - Sends POST to `/api/discover`
+2. **Forward Request** - Gateway forwards request to `{ONIX_URL}/discover`
 3. **Wait for Response** - Gateway waits for synchronous HTTP response
 4. **Return Response** - Gateway returns response directly to client
 
@@ -376,18 +371,18 @@ If no callback is received within 30 seconds:
 ```
 [Request]                              [Redis]                         [Webhook]
    │                                      │                                │
-   ├─ POST /api/discover ────────────────>│                                │
+   ├─ POST /api/search  ────────────────> │                                │
    │  {txn:123, msg:456}                  │                                │
    │                                      │                                │
-   │  ┌─ SET pending:123:456 (TTL 35s)   │                                │
-   │  └─ SUBSCRIBE callback:123:456      │                                │
+   │  ┌─ SET pending:123:456 (TTL 35s)    │                                │
+   │  └─ SUBSCRIBE callback:123:456       │                                │
    │                                      │                                │
-   │  [Waiting on pub/sub...]            │                                │
-   │                                      │<───── POST /webhook/on_discover
+   │  [Waiting on pub/sub...]             │                                │
+   │                                      │<───── POST /webhook/on_search
    │                                      │       {txn:123, msg:456}       │
    │                                      │                                │
-   │                                 ┌─ EXISTS pending:123:456?           │
-   │                                 └─ PUBLISH callback:123:456          │
+   │                                  ┌─ EXISTS pending:123:456?           │
+   │                                  └─ PUBLISH callback:123:456          │
    │                                      │                                │
    │<─ [Pub/sub message received] ────────┤                                │
    │  Response delivered!                 │                                │
